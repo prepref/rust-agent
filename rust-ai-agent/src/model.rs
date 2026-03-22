@@ -18,6 +18,12 @@ pub static THREAT_MAX_NEW_TOKENS: usize = 4096;
 /// Останавливать генерацию, когда `parse_threat_verdict` принимает накопленный вывод.
 pub static THREAT_STOP_ON_JSON: bool = true;
 
+/// Температура сэмплинга (0.2–0.4 — разнообразие confidence). При `0.0` — greedy.
+pub static THREAT_SAMPLE_TEMPERATURE: f32 = 0.3;
+
+/// Seed для `dist` — воспроизводимость при тех же входах и версии llama.cpp.
+pub static THREAT_SAMPLE_SEED: u32 = 42;
+
 pub struct Agent {
     pub name: String,
     pub is_loaded: bool,
@@ -152,7 +158,14 @@ IP: {ip}{ua_hint}\n\
 
         ctx.decode(&mut batch).with_context(|| "Ошибка decode")?;
 
-        let mut sampler = LlamaSampler::chain_simple([LlamaSampler::greedy()]);
+        let mut sampler = if THREAT_SAMPLE_TEMPERATURE > 0.0 {
+            LlamaSampler::chain_simple([
+                LlamaSampler::temp(THREAT_SAMPLE_TEMPERATURE),
+                LlamaSampler::dist(THREAT_SAMPLE_SEED),
+            ])
+        } else {
+            LlamaSampler::chain_simple([LlamaSampler::greedy()])
+        };
         let mut current_token_id = sampler.sample(&ctx, last_index);
         let mut decoder = UTF_8.new_decoder();
         let mut final_answer = String::new();
@@ -182,6 +195,7 @@ IP: {ip}{ua_hint}\n\
             ctx.decode(&mut next_batch)
                 .with_context(|| "Ошибка инференса в цикле генерации")?;
 
+            sampler.accept(current_token_id);
             current_token_id = sampler.sample(&ctx, 0);
             n_gen += 1;
         }

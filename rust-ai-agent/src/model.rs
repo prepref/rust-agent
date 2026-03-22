@@ -84,7 +84,9 @@ Decision policy:\n\
 \n\
 Output contract — reply with exactly ONE JSON object, single line, valid UTF-8, no markdown, no code fences, no keys other than these three:\n\
 {{\"action\":\"BLOCK\"|\"PASS\",\"reason\":\"brief explanation (1–3 short sentences), MUST quote or paraphrase concrete substrings/status/paths from the log\",\"confidence\":0.0}}\n\
-confidence is a float from 0.0 to 1.0 reflecting how well the log supports the decision.\n\
+confidence is a float from 0.0 to 1.0 reflecting how strongly the log lines support your action (not a generic score).\n\
+Calibrate it: strong, explicit attack/tooling evidence in the window -> high (e.g. 0.82–0.97); mixed or indirect signals -> mid (e.g. 0.45–0.78); thin evidence or could be benign -> low (e.g. 0.15–0.55 for PASS with doubt).\n\
+Use two decimal places (e.g. 0.73, 0.88) and vary it across cases — do not default to 0.90, 0.95, or 1.0 every time.\n\
 Do not output any text before or after the JSON object.\n\
 <|im_end|>\n\
 <|im_start|>user\n\

@@ -10,6 +10,8 @@ use llama_cpp_2::model::params::LlamaModelParams;
 use llama_cpp_2::model::{AddBos, LlamaModel};
 use llama_cpp_2::sampling::LlamaSampler;
 
+use crate::parser::parse_threat_verdict;
+
 pub struct Agent {
     pub name: String,
     pub is_loaded: bool,
@@ -102,7 +104,9 @@ IP: {ip}{ua_hint}\n\
 <|im_start|>assistant\n"
         );
 
-        self.generate(&formatted_prompt, &format!("threat:{ip}"), 512, true)
+        // Режим thinking у Qwen и аналогов сильно заполняет вывод до JSON; 512 токенов часто не хватает.
+        const THREAT_MAX_NEW_TOKENS: usize = 4096;
+        self.generate(&formatted_prompt, &format!("threat:{ip}"), THREAT_MAX_NEW_TOKENS, true)
     }
 
     fn generate(&self, formatted_prompt: &str, original_prompt: &str, max_gen: usize, stop_on_json: bool) -> Result<String> {
@@ -176,42 +180,9 @@ IP: {ip}{ua_hint}\n\
     }
 }
 
+/// Ранняя остановка только при полном валидном вердикте IPS.
+/// Старая эвристика (первый `{` + подстрока `"action"` + баланс скобок) обрывала генерацию
+/// на «левом» JSON в блоке thinking (любой ключ `"action"`), до выхода настоящего BLOCK/PASS.
 fn json_object_completed(text: &str) -> bool {
-    let trimmed = text.trim();
-    if !trimmed.starts_with('{') || !trimmed.contains("\"action\"") {
-        return false;
-    }
-
-    let mut balance = 0_i32;
-    let mut in_string = false;
-    let mut escaped = false;
-
-    for ch in trimmed.chars() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-
-        if ch == '\\' && in_string {
-            escaped = true;
-            continue;
-        }
-
-        if ch == '"' {
-            in_string = !in_string;
-            continue;
-        }
-
-        if in_string {
-            continue;
-        }
-
-        match ch {
-            '{' => balance += 1,
-            '}' => balance -= 1,
-            _ => {}
-        }
-    }
-
-    balance == 0 && trimmed.ends_with('}')
+    parse_threat_verdict(text.trim()).is_ok()
 }

@@ -246,7 +246,7 @@ fn main() -> Result<()> {
 }
 
 fn model_path() -> String {
-    "models/qwen3.5-coder-4b.gguf".to_owned()
+    "models/qwen2.5-coder-3b-q80.gguf".to_owned()
 }
 
 fn threat_cases() -> Vec<ThreatCase> {

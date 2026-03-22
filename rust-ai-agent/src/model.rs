@@ -92,12 +92,14 @@ Decision policy:\n\
 - Prefer BLOCK when there is clear abuse or tooling consistent with attack tools, or strong injection/traversal patterns in path/query/UA.\n\
 - Prefer PASS for plausible human browsers or benign crawlers without suspicious payloads or tool UAs.\n\
 - When uncertain, lower confidence; use PASS if evidence is weak and could be a false positive.\n\
+- If the window is ambiguous (mixed benign and suspicious hints, false-positive substrings, or too few events to tell): still choose PASS or BLOCK by best evidence, but you MUST set confidence low (typically below 0.65) to reflect uncertainty — never output high confidence when you are not sure.\n\
 - If UA rotation metadata is present, weigh mixed tool/non-browser UAs toward BLOCK.\n\
 \n\
 Output contract — reply with exactly ONE JSON object, single line, valid UTF-8, no markdown, no code fences, no keys other than these three:\n\
 {{\"action\":\"BLOCK\"|\"PASS\",\"reason\":\"brief explanation (1–3 short sentences), MUST quote or paraphrase concrete substrings/status/paths from the log\",\"confidence\":0.0}}\n\
 confidence is a float from 0.0 to 1.0 reflecting how strongly the log lines support your action (not a generic score).\n\
 Calibrate it: strong, explicit attack/tooling evidence in the window -> high (e.g. 0.82–0.97); mixed or indirect signals -> mid (e.g. 0.45–0.78); thin evidence or could be benign -> low (e.g. 0.15–0.55 for PASS with doubt).\n\
+Uncertainty rule: if you hesitate between PASS and BLOCK, or signals conflict, set confidence in the 0.15–0.60 range even if you pick an action — high values (above ~0.75) are only for clear-cut patterns in the log.\n\
 Use two decimal places (e.g. 0.73, 0.88) and vary it across cases — do not default to 0.90, 0.95, or 1.0 every time.\n\
 Do not output any text before or after the JSON object.\n\
 <|im_end|>\n\

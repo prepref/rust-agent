@@ -3,6 +3,8 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
 
+static VERDICT_JSON_START: OnceLock<Regex> = OnceLock::new();
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ThreatVerdict {
     pub action: ThreatAction,
@@ -78,8 +80,9 @@ fn strip_think_tags(input: &str) -> &str {
 }
 
 fn verdict_json_start_regex() -> &'static Regex {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"\{\s*\"action\"\s*:").expect("verdict json start regex"))
+    VERDICT_JSON_START.get_or_init(|| {
+        Regex::new(r"\{\s*\"action\"\s*:").expect("verdict json start regex")
+    })
 }
 
 /// Начало объекта вердикта по ключу `action` (thinking/Qwen часто кладёт лишние `{` до JSON).

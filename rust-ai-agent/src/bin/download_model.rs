@@ -36,8 +36,9 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn resolve_model_download() -> (&'static str, &'static str) {
+    // Qwen2.5-Coder-3B-Instruct Q8_0 — сохраняем под коротким именем, совпадающим с DEFAULT_MODEL_PATH.
     (
-        "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q5_K_M.gguf",
-        "models/qwen3.5-coder-4b.gguf",
+        "https://huggingface.co/bartowski/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/main/Qwen2.5-Coder-3B-Instruct-Q8_0.gguf",
+        rust_ai_agent::config::DEFAULT_MODEL_PATH,
     )
 }

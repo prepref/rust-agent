@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 use anyhow::Result;
 use chrono::Local;
 use sysinfo::System;
+use rust_ai_agent::config::DEFAULT_MODEL_PATH;
 use rust_ai_agent::model::Agent;
 use rust_ai_agent::parser::{parse_threat_verdict, build_defense_action, DefenseAction};
 
@@ -36,6 +37,8 @@ fn main() -> Result<()> {
 
     println!("--- Benchmark: Threat Analysis (IPS) ---");
     println!("Модель:   {mp}");
+    println!("(путь: аргумент 1 или переменная IPS_MODEL_PATH)");
+    println!("Инференс: см. env IPS_THREAT_* , IPS_QUIET=1 — без потока токенов в консоль");
     println!(
         "Кейсов:   {} (baseline={baseline_count}, holdout={holdout_count}, ambiguous={ambiguous_count})\n",
         cases.len()
@@ -91,6 +94,7 @@ fn main() -> Result<()> {
     let mut fn_ = 0usize; // predicted PASS, expected BLOCK
     let mut errors = 0usize;
     let mut latencies: Vec<u128> = Vec::with_capacity(cases.len());
+    let mut ambiguous_confidences: Vec<f64> = Vec::new();
 
     for (index, case) in cases.iter().enumerate() {
         let events: Vec<String> = case.events.iter().map(|s| s.to_string()).collect();
@@ -157,6 +161,12 @@ fn main() -> Result<()> {
         };
 
         let success = action_taken == case.expected_action;
+
+        if case.group == CaseGroup::Ambiguous {
+            if let Ok(v) = &parsed {
+                ambiguous_confidences.push(v.confidence);
+            }
+        }
 
         let ts = Local::now().format("%Y-%m-%d %H:%M:%S");
         writeln!(
@@ -242,11 +252,36 @@ fn main() -> Result<()> {
     println!("load_ms:        {load_ms}");
     println!("model_ram_mb:   ~{model_ram_mb}");
 
+    if !ambiguous_confidences.is_empty() {
+        let n = ambiguous_confidences.len();
+        let sum: f64 = ambiguous_confidences.iter().sum();
+        let avg = sum / n as f64;
+        let min_c = ambiguous_confidences
+            .iter()
+            .cloned()
+            .fold(f64::INFINITY, f64::min);
+        let max_c = ambiguous_confidences
+            .iter()
+            .cloned()
+            .fold(f64::NEG_INFINITY, f64::max);
+        let below_065 = ambiguous_confidences.iter().filter(|&&c| c < 0.65).count();
+        println!();
+        println!("=== Группа ambiguous (confidence, успешный разбор) ===");
+        println!(
+            "n={n}  avg={avg:.3}  min={min_c:.2}  max={max_c:.2}  conf<0.65: {below_065}/{n}"
+        );
+    }
+
     Ok(())
 }
 
+/// Путь к GGUF: первый аргумент `cargo run --bin benchmark -- <path>`, иначе `IPS_MODEL_PATH`, иначе значение по умолчанию.
 fn model_path() -> String {
-    "models/qwen3.5-coder-4b.gguf".to_owned()
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() >= 2 && !args[1].starts_with('-') {
+        return args[1].clone();
+    }
+    std::env::var("IPS_MODEL_PATH").unwrap_or_else(|_| DEFAULT_MODEL_PATH.to_owned())
 }
 
 fn threat_cases() -> Vec<ThreatCase> {

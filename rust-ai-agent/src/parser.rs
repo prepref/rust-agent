@@ -222,4 +222,17 @@ mod tests {
         let verdict = parse_threat_verdict(raw).unwrap();
         assert_eq!(verdict.action, ThreatAction::Pass);
     }
+
+    /// Регрессия: длинный префикс «рассуждений» + один JSON (как у моделей с thinking).
+    #[test]
+    fn extracts_verdict_after_long_thinking_prefix() {
+        let raw = r#"Thinking Process:
+1. Role: IPS. 2. Task: classify logs.
+3. Heuristic: check UA and paths.
+Final output must be JSON only.
+{"action":"PASS","reason":"Normal browsing pattern in window","confidence":0.42}"#;
+        let verdict = parse_threat_verdict(raw).unwrap();
+        assert_eq!(verdict.action, ThreatAction::Pass);
+        assert!((verdict.confidence - 0.42).abs() < f64::EPSILON);
+    }
 }

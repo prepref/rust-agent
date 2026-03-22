@@ -10,19 +10,8 @@ use llama_cpp_2::model::params::LlamaModelParams;
 use llama_cpp_2::model::{AddBos, LlamaModel};
 use llama_cpp_2::sampling::LlamaSampler;
 
+use crate::config::ThreatInferenceConfig;
 use crate::parser::parse_threat_verdict;
-
-/// Макс. новых токенов на один вызов threat-анализа (thinking + JSON).
-pub static THREAT_MAX_NEW_TOKENS: usize = 4096;
-
-/// Останавливать генерацию, когда `parse_threat_verdict` принимает накопленный вывод.
-pub static THREAT_STOP_ON_JSON: bool = true;
-
-/// Температура сэмплинга (0.2–0.4 — разнообразие confidence). При `0.0` — greedy.
-pub static THREAT_SAMPLE_TEMPERATURE: f32 = 0.4;
-
-/// Seed для `dist` — воспроизводимость при тех же входах и версии llama.cpp.
-pub static THREAT_SAMPLE_SEED: u32 = 42;
 
 pub struct Agent {
     pub name: String,
@@ -120,15 +109,13 @@ IP: {ip}{ua_hint}\n\
 <|im_start|>assistant\n"
         );
 
-        self.generate(
-            &formatted_prompt,
-            &format!("threat:{ip}"),
-            THREAT_MAX_NEW_TOKENS,
-            THREAT_STOP_ON_JSON,
-        )
+        self.generate(&formatted_prompt, &format!("threat:{ip}"))
     }
 
-    fn generate(&self, formatted_prompt: &str, original_prompt: &str, max_gen: usize, stop_on_json: bool) -> Result<String> {
+    fn generate(&self, formatted_prompt: &str, original_prompt: &str) -> Result<String> {
+        let cfg = ThreatInferenceConfig::from_env();
+        let max_gen = cfg.max_new_tokens;
+        let stop_on_json = cfg.stop_on_json;
         if !self.is_loaded {
             bail!("Модель не загружена!");
         }
@@ -160,10 +147,10 @@ IP: {ip}{ua_hint}\n\
 
         ctx.decode(&mut batch).with_context(|| "Ошибка decode")?;
 
-        let mut sampler = if THREAT_SAMPLE_TEMPERATURE > 0.0 {
+        let mut sampler = if cfg.sample_temperature > 0.0 {
             LlamaSampler::chain_simple([
-                LlamaSampler::temp(THREAT_SAMPLE_TEMPERATURE),
-                LlamaSampler::dist(THREAT_SAMPLE_SEED),
+                LlamaSampler::temp(cfg.sample_temperature),
+                LlamaSampler::dist(cfg.sample_seed),
             ])
         } else {
             LlamaSampler::chain_simple([LlamaSampler::greedy()])
@@ -181,8 +168,10 @@ IP: {ip}{ua_hint}\n\
             let piece = model.token_to_piece(current_token_id, &mut decoder, false, None)
                 .with_context(|| "Ошибка декодирования токена")?;
 
-            print!("{}", piece);
-            std::io::Write::flush(&mut std::io::stdout())?;
+            if !cfg.quiet {
+                print!("{}", piece);
+                std::io::Write::flush(&mut std::io::stdout())?;
+            }
 
             final_answer.push_str(&piece);
 
@@ -202,7 +191,9 @@ IP: {ip}{ua_hint}\n\
             n_gen += 1;
         }
 
-        println!("\n--- Генерация завершена ---");
+        if !cfg.quiet {
+            println!("\n--- Генерация завершена ---");
+        }
         Ok(final_answer.trim().to_owned())
     }
 }

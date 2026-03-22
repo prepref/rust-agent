@@ -180,7 +180,14 @@ fn has_flag(flag: &str) -> bool {
 }
 
 fn resolve_model_path() -> String {
-    "models/qwen2.5-coder-1.5b-no-instruct.gguf".to_owned()
+    let args: Vec<String> = std::env::args().collect();
+    if let Some(i) = args.iter().position(|a| a == "--model") {
+        if let Some(v) = args.get(i + 1) {
+            return v.clone();
+        }
+    }
+    std::env::var("IPS_MODEL_PATH")
+        .unwrap_or_else(|_| crate::config::DEFAULT_MODEL_PATH.to_owned())
 }
 
 fn resolve_log_path() -> String {

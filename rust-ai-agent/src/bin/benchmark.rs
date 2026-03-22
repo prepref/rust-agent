@@ -13,6 +13,8 @@ use rust_ai_agent::parser::{parse_threat_verdict, build_defense_action, DefenseA
 enum CaseGroup {
     Baseline,
     Holdout,
+    /// Двусмысленные логи: ожидаем PASS (не блокировать без явной атаки), низкая уверенность — норма.
+    Ambiguous,
 }
 
 struct ThreatCase {
@@ -30,10 +32,14 @@ fn main() -> Result<()> {
 
     let baseline_count = cases.iter().filter(|c| c.group == CaseGroup::Baseline).count();
     let holdout_count = cases.iter().filter(|c| c.group == CaseGroup::Holdout).count();
+    let ambiguous_count = cases.iter().filter(|c| c.group == CaseGroup::Ambiguous).count();
 
     println!("--- Benchmark: Threat Analysis (IPS) ---");
     println!("Модель:   {mp}");
-    println!("Кейсов:   {} (baseline={baseline_count}, holdout={holdout_count})\n", cases.len());
+    println!(
+        "Кейсов:   {} (baseline={baseline_count}, holdout={holdout_count}, ambiguous={ambiguous_count})\n",
+        cases.len()
+    );
 
     let mut sys = System::new_all();
     sys.refresh_all();
@@ -91,6 +97,7 @@ fn main() -> Result<()> {
         let group_str = match case.group {
             CaseGroup::Baseline => "baseline",
             CaseGroup::Holdout => "holdout",
+            CaseGroup::Ambiguous => "ambiguous",
         };
 
         sys.refresh_all();
@@ -507,6 +514,68 @@ fn threat_cases() -> Vec<ThreatCase> {
             ua_rotation: false,
             unique_ua_count: 1,
             group: CaseGroup::Holdout,
+        },
+
+        // ===== AMBIGUOUS (пограничные сигналы — эталон PASS; низкий confidence ожидаем для демонстрации неуверенности) =====
+
+        // Подстрока SELECT в бенигном контексте (не SQLi).
+        ThreatCase {
+            ip: "10.11.12.13",
+            events: vec![
+                "GET /reports?status=SELECTED&year=2024 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0",
+                "GET /reports/export?columns=SELECTED,name,date 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0",
+                "GET /dashboard 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0",
+                "GET /settings 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0",
+            ],
+            expected_action: "PASS",
+            ua_rotation: false,
+            unique_ua_count: 1,
+            group: CaseGroup::Ambiguous,
+        },
+
+        // Два 401 подряд на /login — похоже на ошибку пароля, не на массовый брут.
+        ThreatCase {
+            ip: "172.20.30.40",
+            events: vec![
+                "POST /login 401 | UA: Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) Safari/605.1.15",
+                "POST /login 401 | UA: Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) Safari/605.1.15",
+                "GET / 200 | UA: Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) Safari/605.1.15",
+                "GET /help 200 | UA: Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) Safari/605.1.15",
+            ],
+            expected_action: "PASS",
+            ua_rotation: false,
+            unique_ua_count: 1,
+            group: CaseGroup::Ambiguous,
+        },
+
+        // Смешанное окно: в основном Chrome, один запрос с curl — без явной атаки в пути.
+        ThreatCase {
+            ip: "198.18.0.50",
+            events: vec![
+                "GET /news 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/121.0",
+                "GET /article/42 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/121.0",
+                "HEAD /article/42 200 | UA: curl/8.5.0",
+                "GET /contact 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/121.0",
+                "GET /about 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/121.0",
+            ],
+            expected_action: "PASS",
+            ua_rotation: false,
+            unique_ua_count: 1,
+            group: CaseGroup::Ambiguous,
+        },
+
+        // «Траверсал» в каноническом пути документации (часто легитимно).
+        ThreatCase {
+            ip: "10.99.1.2",
+            events: vec![
+                "GET /docs/../docs/install 200 | UA: Mozilla/5.0 (X11; Linux x86_64) Firefox/121.0",
+                "GET /static/app.js 200 | UA: Mozilla/5.0 (X11; Linux x86_64) Firefox/121.0",
+                "GET /api/health 200 | UA: Mozilla/5.0 (X11; Linux x86_64) Firefox/121.0",
+            ],
+            expected_action: "PASS",
+            ua_rotation: false,
+            unique_ua_count: 1,
+            group: CaseGroup::Ambiguous,
         },
     ]
 }

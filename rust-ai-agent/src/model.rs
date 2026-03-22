@@ -12,6 +12,12 @@ use llama_cpp_2::sampling::LlamaSampler;
 
 use crate::parser::parse_threat_verdict;
 
+/// Макс. новых токенов на один вызов threat-анализа (thinking + JSON).
+pub static THREAT_MAX_NEW_TOKENS: usize = 4096;
+
+/// Останавливать генерацию, когда `parse_threat_verdict` принимает накопленный вывод.
+pub static THREAT_STOP_ON_JSON: bool = true;
+
 pub struct Agent {
     pub name: String,
     pub is_loaded: bool,
@@ -106,9 +112,12 @@ IP: {ip}{ua_hint}\n\
 <|im_start|>assistant\n"
         );
 
-        // Режим thinking у Qwen и аналогов сильно заполняет вывод до JSON; 512 токенов часто не хватает.
-        const THREAT_MAX_NEW_TOKENS: usize = 4096;
-        self.generate(&formatted_prompt, &format!("threat:{ip}"), THREAT_MAX_NEW_TOKENS, true)
+        self.generate(
+            &formatted_prompt,
+            &format!("threat:{ip}"),
+            THREAT_MAX_NEW_TOKENS,
+            THREAT_STOP_ON_JSON,
+        )
     }
 
     fn generate(&self, formatted_prompt: &str, original_prompt: &str, max_gen: usize, stop_on_json: bool) -> Result<String> {

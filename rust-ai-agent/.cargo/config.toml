@@ -1,0 +1,3 @@
+# Путь к libcudart (CUDA) на Debian/Ubuntu; нужен для линковки llama-cpp-sys-2 с feature "cuda".
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-L", "native=/usr/lib/x86_64-linux-gnu"]

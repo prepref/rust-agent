@@ -37,7 +37,7 @@ fn main() -> anyhow::Result<()> {
 
 fn resolve_model_download() -> (&'static str, &'static str) {
     (
-        "https://huggingface.co/neopolita/qwen2.5-coder-1.5b-gguf/resolve/main/qwen2.5-coder-1.5b_q4_k_m.gguf",
-        "models/qwen2.5-coder-1.5b-no-instruct.gguf",
+        "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q5_K_M.gguf",
+        "models/qwen3.5-coder-4b.gguf",
     )
 }

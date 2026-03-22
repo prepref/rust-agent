@@ -19,7 +19,7 @@ pub static THREAT_MAX_NEW_TOKENS: usize = 4096;
 pub static THREAT_STOP_ON_JSON: bool = true;
 
 /// Температура сэмплинга (0.2–0.4 — разнообразие confidence). При `0.0` — greedy.
-pub static THREAT_SAMPLE_TEMPERATURE: f32 = 0.3;
+pub static THREAT_SAMPLE_TEMPERATURE: f32 = 0.4;
 
 /// Seed для `dist` — воспроизводимость при тех же входах и версии llama.cpp.
 pub static THREAT_SAMPLE_SEED: u32 = 42;

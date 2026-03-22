@@ -1,5 +1,7 @@
 use anyhow::{Context, Result, bail};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::sync::OnceLock;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ThreatVerdict {
@@ -36,7 +38,7 @@ pub fn parse_threat_verdict(raw: &str) -> Result<ThreatVerdict> {
         return Ok(parsed);
     }
 
-    let json_fragment = extract_first_json_object(clean)
+    let json_fragment = extract_verdict_json_object(clean)
         .context("В вердикте модели не найден JSON-объект")?;
 
     serde_json::from_str::<ThreatVerdict>(json_fragment)
@@ -73,6 +75,27 @@ fn strip_think_tags(input: &str) -> &str {
     } else {
         input
     }
+}
+
+fn verdict_json_start_regex() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| Regex::new(r"\{\s*\"action\"\s*:").expect("verdict json start regex"))
+}
+
+/// Начало объекта вердикта по ключу `action` (thinking/Qwen часто кладёт лишние `{` до JSON).
+fn find_verdict_json_start(input: &str) -> Option<usize> {
+    verdict_json_start_regex()
+        .find(input)
+        .map(|m| m.start())
+}
+
+fn extract_verdict_json_object(input: &str) -> Option<&str> {
+    if let Some(start) = find_verdict_json_start(input) {
+        if let Some(obj) = extract_first_json_object(&input[start..]) {
+            return Some(obj);
+        }
+    }
+    extract_first_json_object(input)
 }
 
 fn extract_first_json_object(input: &str) -> Option<&str> {
@@ -175,5 +198,25 @@ mod tests {
         let raw = r#"Here is my analysis: {"action":"BLOCK","reason":"scanner","confidence":0.9} done"#;
         let verdict = parse_threat_verdict(raw).unwrap();
         assert_eq!(verdict.action, ThreatAction::Block);
+    }
+
+    #[test]
+    fn extracts_verdict_after_thinking_with_stray_brace() {
+        let raw = r#"Step 1: consider { fake } then output:
+{"action":"BLOCK","reason":"scanner","confidence":0.9}"#;
+        let verdict = parse_threat_verdict(raw).unwrap();
+        assert_eq!(verdict.action, ThreatAction::Block);
+    }
+
+    #[test]
+    fn extracts_pretty_printed_verdict_after_prefix() {
+        let raw = r#"Reasoning line.
+{
+  "action": "PASS",
+  "reason": "ok",
+  "confidence": 0.5
+}"#;
+        let verdict = parse_threat_verdict(raw).unwrap();
+        assert_eq!(verdict.action, ThreatAction::Pass);
     }
 }

@@ -81,7 +81,7 @@ fn strip_think_tags(input: &str) -> &str {
 
 fn verdict_json_start_regex() -> &'static Regex {
     VERDICT_JSON_START.get_or_init(|| {
-        Regex::new(r"\{\s*\"action\"\s*:").expect("verdict json start regex")
+        Regex::new(r#"\{\s*"action"\s*:"#).expect("verdict json start regex")
     })
 }
 

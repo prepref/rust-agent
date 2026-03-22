@@ -1,0 +1,35 @@
+# Rust
+**/target/
+**/*.rs.bk
+*.pdb
+
+# Локальные модели (GGUF)
+**/*.gguf
+**/models/
+
+# Логи
+**/logs/
+*.log
+
+# Окружение и секреты
+.env
+.env.*
+!.env.example
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Отладка / профили
+*.dSYM/
+*.su
+*.idb
+
+# Docker (локальные оверрайды и артефакты)
+**/docker-compose.override.yml
+.docker/

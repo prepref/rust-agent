@@ -1,0 +1,24 @@
+# Git / VCS
+.git
+.gitignore
+**/.git
+
+# Rust build
+**/target/
+**/*.rs.bk
+
+# Тяжёлые и локальные артефакты
+**/*.gguf
+**/models/
+**/logs/
+*.log
+
+# Секреты
+.env
+.env.*
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

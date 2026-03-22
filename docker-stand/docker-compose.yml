@@ -1,0 +1,31 @@
+
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - nginx-logs:/var/log/nginx
+    depends_on:
+      - dvwa
+    networks:
+      - ips-net
+
+  dvwa:
+    image: vulnerables/web-dvwa
+    environment:
+      - RECAPTCHA_PRIV_KEY=
+      - RECAPTCHA_PUB_KEY=
+      - SECURITY_LEVEL=low
+      - PHPIDS_ENABLED=0
+    networks:
+      - ips-net
+
+volumes:
+  nginx-logs:
+    driver: local
+
+networks:
+  ips-net:
+    driver: bridge

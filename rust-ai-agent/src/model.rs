@@ -93,7 +93,7 @@ Use two decimal places (e.g. 0.73, 0.88) and vary it across cases — do not def
 Do not output any text before or after the JSON object.\n\
 <|im_end|>\n\
 <|im_start|>user\n\
-Below are access-log lines for a single IP (and optional UA-rotation note). Apply the system instructions.\n\
+Below are access-log lines for a single IP (and optional UA-rotation note). Lines may include an optional digest block after User-Agent: `| H: ...` (selected request headers). Apply the system instructions.\n\
 \n\
 Concrete heuristics to apply against the log text (do not copy this list into \"reason\" verbatim — cite the log instead):\n\
 - BLOCK if any \"UA:\" matches (case-insensitive) tool patterns such as: sqlmap, nikto, nmap, hydra, gobuster, wfuzz, masscan, python-requests, curl, wget, Go-http-client, or similar.\n\

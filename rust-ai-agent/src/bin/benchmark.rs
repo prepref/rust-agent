@@ -88,11 +88,8 @@ fn main() -> Result<()> {
         .open(verdict_log_path)?;
     println!("Лог вердиктов: {verdict_log_path}");
 
-    let mut tp = 0usize; // predicted BLOCK, expected BLOCK (via defense action)
-    let mut fp = 0usize; // predicted BLOCK, expected PASS
-    let mut tn = 0usize; // predicted PASS, expected PASS
-    let mut fn_ = 0usize; // predicted PASS, expected BLOCK
     let mut errors = 0usize;
+    let mut matches = 0usize;
     let mut latencies: Vec<u128> = Vec::with_capacity(cases.len());
     let mut ambiguous_confidences: Vec<f64> = Vec::new();
 
@@ -161,6 +158,9 @@ fn main() -> Result<()> {
         };
 
         let success = action_taken == case.expected_action;
+        if success {
+            matches += 1;
+        }
 
         if case.group == CaseGroup::Ambiguous {
             if let Ok(v) = &parsed {
@@ -203,14 +203,6 @@ fn main() -> Result<()> {
         writeln!(verdict_log, "{}", "=".repeat(72))?;
         writeln!(verdict_log)?;
 
-        match (case.expected_action, action_taken.as_str()) {
-            ("BLOCK", "BLOCK") => tp += 1,
-            ("PASS", "BLOCK") => fp += 1,
-            ("PASS", "PASS") => tn += 1,
-            ("BLOCK", "PASS") => fn_ += 1,
-            _ => {}
-        }
-
         writeln!(
             csv,
             "\"{mp}\",{load_ms},{model_ram_mb},{},{group_str},{},{latency_ms},{ram_mb},{cpu_before:.1},{cpu_after:.1},\"{}\",\"{predicted}\",{confidence:.2},\"{action_taken}\",{success}",
@@ -232,21 +224,11 @@ fn main() -> Result<()> {
     let max_latency = latencies.last().copied().unwrap_or(0);
     let p95_latency = if n == 0 { 0 } else { latencies[(n as f64 * 0.95).ceil() as usize - 1] };
 
-    let precision = if tp + fp > 0 { tp as f64 / (tp + fp) as f64 } else { 0.0 };
-    let recall = if tp + fn_ > 0 { tp as f64 / (tp + fn_) as f64 } else { 0.0 };
-    let f1 = if precision + recall > 0.0 { 2.0 * precision * recall / (precision + recall) } else { 0.0 };
-    let accuracy = if n > 0 { (tp + tn) as f64 / (n - errors) as f64 } else { 0.0 };
-
+    let ok_cases = cases.len() - errors;
     println!("\n=== Итог (defense action = build_defense_action с порогом confidence >= 0.7) ===");
-    println!("accuracy:       {:.2}% ({}/{} кейсов)", accuracy * 100.0, tp + tn, n - errors);
-    println!("precision:      {:.2}%", precision * 100.0);
-    println!("recall:         {:.2}%", recall * 100.0);
-    println!("f1:             {:.4}", f1);
-    println!();
-    println!("confusion matrix:");
-    println!("  TP={tp}  FP={fp}");
-    println!("  FN={fn_}  TN={tn}");
-    println!("  errors={errors}");
+    println!(
+        "совпало с эталоном: {matches} / {ok_cases} (ошибок инференса: {errors})",
+    );
     println!();
     println!("latency (ms):   avg={avg_latency:.1}  min={min_latency}  max={max_latency}  p95={p95_latency}");
     println!("load_ms:        {load_ms}");

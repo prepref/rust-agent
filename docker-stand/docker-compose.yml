@@ -1,14 +1,24 @@
-
 services:
+  # Одноразово создаёт на хосте ./logs/nginx (bind mount) до старта nginx
+  logs-init:
+    image: alpine:3.19
+    volumes:
+      - ./logs/nginx:/target
+    command: sh -c "mkdir -p /target && chmod 0755 /target"
+    restart: "no"
+
   nginx:
     image: nginx:alpine
     ports:
       - "8080:80"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-      - nginx-logs:/var/log/nginx
+      - ./logs/nginx:/var/log/nginx
     depends_on:
-      - dvwa
+      dvwa:
+        condition: service_started
+      logs-init:
+        condition: service_completed_successfully
     networks:
       - ips-net
 
@@ -21,10 +31,6 @@ services:
       - PHPIDS_ENABLED=0
     networks:
       - ips-net
-
-volumes:
-  nginx-logs:
-    driver: local
 
 networks:
   ips-net:

@@ -43,6 +43,43 @@ volumes:
 - Вручную: работа в браузере по разделам DVWA.  
 - Скрипты с инструментами: каталог `attack-scripts/` (нужны `sqlmap` / `hydra` и cookie сессии — см. комментарии в скриптах).
 
+### Нагрузка (k6, каталог `load-tests/`)
+
+Один раз: `setup.php` → создать БД. В скриптах логин `admin` / `password`.
+
+| Файл | Смысл |
+|------|--------|
+| `dvwa_auth.js` | вход в DVWA |
+| `paths.js` | списки URL: легитимные, гостевые, с payload (можно дополнять) |
+| `k6-mixed.js` | обычные запросы + с payload в URL |
+| `k6-benign.js` | только обычные |
+
+На Linux, если [k6](https://k6.io/) установлен:
+
+```bash
+cd load-tests
+k6 run k6-mixed.js
+# или: k6 run k6-benign.js
+```
+
+Без k6 на хосте — из каталога `docker-stand`:
+
+```bash
+docker compose --profile load run --rm k6-mixed
+```
+
+Переменные при необходимости: `BASE_URL`, `BAD_RATIO`, `K6_VUS`, `K6_DURATION`, `DVWA_USER`, `DVWA_PASSWORD`, `SKIP_LOGIN=1`.
+
+Фон benign + утилита атаки в одной оболочке:
+
+```bash
+cd load-tests
+k6 run k6-benign.js &
+K6=$!
+../attack-scripts/run_sqlmap.sh
+kill $K6
+```
+
 ## Остановка
 
 ```bash

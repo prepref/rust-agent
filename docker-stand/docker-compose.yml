@@ -32,6 +32,48 @@ services:
     networks:
       - ips-net
 
+  # Одноразовый прогон k6 (профиль load). В логах nginx клиент — IP контейнера k6.
+  k6-mixed:
+    image: grafana/k6:latest
+    profiles:
+      - load
+    networks:
+      - ips-net
+    volumes:
+      - ./load-tests:/scripts:ro
+    working_dir: /scripts
+    environment:
+      BASE_URL: http://nginx
+      BAD_RATIO: "0.15"
+      K6_VUS: "5"
+      K6_DURATION: "2m"
+      DVWA_USER: admin
+      DVWA_PASSWORD: password
+    command: ["run", "k6-mixed.js"]
+    depends_on:
+      nginx:
+        condition: service_started
+
+  k6-benign:
+    image: grafana/k6:latest
+    profiles:
+      - load
+    networks:
+      - ips-net
+    volumes:
+      - ./load-tests:/scripts:ro
+    working_dir: /scripts
+    environment:
+      BASE_URL: http://nginx
+      K6_VUS: "5"
+      K6_DURATION: "2m"
+      DVWA_USER: admin
+      DVWA_PASSWORD: password
+    command: ["run", "k6-benign.js"]
+    depends_on:
+      nginx:
+        condition: service_started
+
 networks:
   ips-net:
     driver: bridge
